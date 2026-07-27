@@ -7,6 +7,7 @@ s3_client = boto3.client(
     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
     aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
     region_name=settings.AWS_REGION,
+    endpoint_url=f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 )
 
 def upload_image(file_bytes: bytes, content_type: str, folder: str = "raw") -> str:
@@ -17,8 +18,8 @@ def upload_image(file_bytes: bytes, content_type: str, folder: str = "raw") -> s
         Body=file_bytes,
         ContentType=content_type,
     )
-    return f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{key}"
+    return f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/{settings.S3_BUCKET_NAME}/{key}"
 
 def delete_image(image_url: str) -> None:
-    key = image_url.split(".amazonaws.com/")[-1]
+    key = "/".join(image_url.split("/")[-2:])
     s3_client.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=key)

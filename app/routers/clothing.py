@@ -6,6 +6,7 @@ from app.models.clothing import ClothingItem
 from app.schemas.clothing import ClothingItemCreate, ClothingItemUpdate, ClothingItemOut
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.services.s3 import upload_image, delete_image
 
 router = APIRouter(prefix="/clothing", tags=["clothing"])
 
@@ -46,6 +47,39 @@ def create_item(
     db.add(item)
     db.commit()
     db.refresh(item)
+    return item
+
+@router.post("/{item_id}/upload-image", response_model=ClothingItemOut)
+async def upload_item_image(
+    item_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    item = db.query(ClothingItem).filter(
+        ClothingItem.id == item_id,
+        ClothingItem.owner_id == current_user.id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    contents = await file.read()
+
+    raw_url = upload_image(contents, file.content_type, folder="raw")
+    item.image_url = raw_url
+
+    from app.services.cv import process_clothing_image
+    cv_results = process_clothing_image(contents, file.content_type)
+    #print(f"CV results key: {cv_results.keys()}")
+    #print(f"Embedding length: {len(cv_results['clip_embedding'])}")
+    #print(f"Embedding sample: {cv_results['clip_embedding'][:5]}")
+    item.image_url_clean = cv_results["image_url_clean"]
+    item.clip_embedding = cv_results["clip_embedding"]
+    #print(f"Item clip_embedding set: {item.clip_embedding[:5] if item.clip_embedding else None}")
+
+    db.commit()
+    db.refresh(item)
+    #print(f"After commit clip_embedding: {item.clip_embedding[:5] if item.clip_embedding else None}")
     return item
 
 @router.patch("/{item_id}", response_model=ClothingItemOut)

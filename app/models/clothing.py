@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, Float, DateTime, ForeignKey, ARRAY, Integ
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.ext.mutable import MutableList
 import uuid
 from app.database import Base
 
@@ -21,6 +22,7 @@ class ClothingItem(Base):
     price = Column(Float, nullable=True)
     image_url = Column(String, nullable=True)
     image_url_clean = Column(String, nullable=True)
+    clip_embedding = Column(MutableList.as_mutable(ARRAY(Float)), nullable=True)
     times_worn = Column(Integer, default=0)
     last_worn_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
