@@ -70,16 +70,14 @@ async def upload_item_image(
 
     from app.services.cv import process_clothing_image
     cv_results = process_clothing_image(contents, file.content_type)
-    #print(f"CV results key: {cv_results.keys()}")
-    #print(f"Embedding length: {len(cv_results['clip_embedding'])}")
-    #print(f"Embedding sample: {cv_results['clip_embedding'][:5]}")
     item.image_url_clean = cv_results["image_url_clean"]
     item.clip_embedding = cv_results["clip_embedding"]
-    #print(f"Item clip_embedding set: {item.clip_embedding[:5] if item.clip_embedding else None}")
+    item.category = cv_results["category"]
+    item.formality = cv_results["formality"]
+    item.color = cv_results["color"]
 
     db.commit()
     db.refresh(item)
-    #print(f"After commit clip_embedding: {item.clip_embedding[:5] if item.clip_embedding else None}")
     return item
 
 @router.patch("/{item_id}", response_model=ClothingItemOut)
