@@ -75,6 +75,7 @@ async def upload_item_image(
     item.category = cv_results["category"]
     item.formality = cv_results["formality"]
     item.color = cv_results["color"]
+    item.color_hex = cv_results["color_hex"]
 
     db.commit()
     db.refresh(item)
@@ -114,3 +115,29 @@ def delete_item(
     db.delete(item)
     db.commit()
     return {"detail": "Deleted"}
+
+@router.get("/{item_id}/similar", response_model=List[ClothingItemOut])
+def get_similar(
+    item_id: str,
+    top_k: int = 5,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    item = db.query(ClothingItem).filter(
+        ClothingItem.id == item_id,
+        ClothingItem.owner_id == current_user.id
+    ).first()
+    if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+    if item.clip_embedding is None:
+            raise HTTPException(status_code=400, details="Item has no embedding yet, upload image first.")
+
+    results = db.query(ClothingItem).filter(
+        ClothingItem.owner_id == current_user.id,
+        ClothingItem.id != item.id,
+        ClothingItem.clip_embedding.isnot(None)
+    ).order_by(
+        ClothingItem.clip_embedding.cosine_distance(item.clip_embedding)
+    ).limit(top_k).all()
+
+    return results

@@ -9,6 +9,10 @@ import numpy as np
 from PIL import Image
 from rembg import remove
 from app.services.s3 import upload_image
+from sklearn.cluster import KMeans
+import numpy as np
+from PIL import Image
+import io
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -101,23 +105,78 @@ def classify_clothing(image_bytes: bytes) -> dict:
         "color": color
     }
 
+COLOR_LOOKUP = {
+    "black":  [0, 0, 0],
+    "white":  [100, 0, 0],
+    "grey":   [55, 0, 2],
+    "beige":  [65, 4, 8],
+    "brown":  [35, 15, 20],
+    "red":    [40, 55, 45],
+    "orange": [60, 30, 50],
+    "yellow": [90, -10, 80],
+    "green":  [45, -35, 35],
+    "blue":   [35, 10, -45],
+    "purple": [35, 35, -30],
+    "pink":   [75, 30, 5],
+    "multi":  [50, 0, 0],
+}
+
+def extract_dominant_color(image_bytes: bytes) -> tuple[str, str]:
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    arr = np.array(image)
+
+    mask = arr[:, :, 3] > 128
+    pixels = arr[mask][:, :3].astype(np.float32)
+
+    if len(pixels) < 10:
+        return "unknown", "#000000"
+
+    if len(pixels) > 5000:
+        idx = np.random.choice(len(pixels), 5000, replace=False)
+        pixels = pixels[idx]
+
+    k = min(3, len(pixels))
+    kmeans = KMeans(n_clusters=k, n_init=5, random_state=42)
+    kmeans.fit(pixels)
+
+    counts = np.bincount(kmeans.labels_)
+    dominant_rgb = kmeans.cluster_centers_[counts.argmax()]
+
+    r, g, b = [int(c) for c in dominant_rgb]
+    hex_color = f"#{r:02x}{g:02x}{b:02x}"
+
+    from skimage.color import rgb2lab
+    rgb_normalized = np.array([[[r / 255, g / 255, b / 255]]], dtype=np.float32)
+    lab = rgb2lab(rgb_normalized)[0][0]
+
+    min_dist = float("inf")
+    nearest_color = "black"
+    for name, lab_ref in COLOR_LOOKUP.items():
+        if name == "multi":
+            continue
+        dist = np.sqrt(sum((lab[i] - lab_ref[i]) ** 2 for i in range(3)))
+        if dist < min_dist:
+            min_dist = dist
+            nearest_color = name
+
+    return nearest_color, hex_color
+
 def process_clothing_image(raw_bytes: bytes, content_type: str) -> dict:
-    # step 1: remove background
     clean_bytes = remove_background(raw_bytes)
 
-    # step 2: upload clean image to R2
     clean_url = upload_image(clean_bytes, "image/png", folder="clean")
 
-    # step 3: generate CLIP embedding
     embedding = generate_clip_embedding(clean_bytes)
 
-    # step 4: classify clothing
     tags = classify_clothing(clean_bytes)
+
+    color_name, color_hex = extract_dominant_color(clean_bytes)
 
     return {
         "image_url_clean": clean_url,
         "clip_embedding": embedding,
         "category": tags["category"],
         "formality": tags["formality"],
-        "color": tags["color"]
+        "color": color_name,
+        "color_hex": color_hex,
     }
