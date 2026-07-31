@@ -18,25 +18,27 @@ Detailed build logs, training results, architecture decisions, and every error a
 
 ## Architecture
 
+```
 minoire-app/
 ├── app/
-│ ├── main.py — entry point, router registration
-│ ├── config.py — environment variable loading
-│ ├── database.py — SQLAlchemy engine and session
-│ ├── dependencies.py — JWT auth guard
-│ ├── models/ — SQLAlchemy ORM table definitions
-│ ├── schemas/ — Pydantic request/response models
-│ ├── routers/ — FastAPI route handlers
-│ └── services/
-│ ├── auth.py — password hashing, JWT
-│ ├── s3.py — Cloudflare R2 upload/delete
-│ ├── cv.py — CV pipeline (rembg, CLIP, EfficientNet, K-means)
-│ └── outfit_scorer.py — color harmony and formality scoring
-├── models/ — trained model weights and label encoders
+│   ├── main.py             — entry point, router registration
+│   ├── config.py           — environment variable loading
+│   ├── database.py         — SQLAlchemy engine and session
+│   ├── dependencies.py     — JWT auth guard
+│   ├── models/              — SQLAlchemy ORM table definitions
+│   ├── schemas/              — Pydantic request/response models
+│   ├── routers/              — FastAPI route handlers
+│   └── services/
+│       ├── auth.py         — password hashing, JWT
+│       ├── s3.py           — Cloudflare R2 upload/delete
+│       ├── cv.py           — CV pipeline (rembg, CLIP, EfficientNet, K-means)
+│       └── outfit_scorer.py — color harmony and formality scoring
+├── models/                  — trained model weights and label encoders
 ├── config/
-│ └── color_lookup.json — 949 XKCD colors with Lab values
+│   └── color_lookup.json   — 949 XKCD colors with Lab values
 └── scripts/
-└── generate_color_lookup.py
+    └── generate_color_lookup.py
+```
 
 ---
 
@@ -171,4 +173,4 @@ API docs available at `http://127.0.0.1:8000/docs`
 
 ## Author
 
-Farida Sabra — [faridasabra.github.io](https://faridasabra.github.io) · [LinkedIn](https://www.linkedin.com/in/farida-sabra/)
+Farida Sabra - [faridasabra.github.io](https://faridasabra.github.io) · [LinkedIn](https://www.linkedin.com/in/farida-sabra/)
