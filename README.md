@@ -44,10 +44,10 @@ minoire-app/
 
 Every clothing photo goes through a four-step pipeline on upload:
 
-1. **Background removal** — rembg (U2-Net) produces a transparent-background PNG
-2. **Semantic embedding** — CLIP ViT-B/32 generates a 512-dimensional L2-normalized vector stored in pgvector
-3. **Classification** — EfficientNet-B3 fine-tuned on Fashion Product Images dataset predicts category and formality (99.5% validation accuracy on category)
-4. **Color extraction** — K-means clustering (k=5) in Lab color space extracts primary, secondary, and tertiary colors matched against 949 XKCD named colors
+1. **Background removal:** rembg (U2-Net) produces a transparent-background PNG
+2. **Semantic embedding:** CLIP ViT-B/32 generates a 512-dimensional L2-normalized vector stored in pgvector
+3. **Classification:** EfficientNet-B3 fine-tuned on Fashion Product Images dataset predicts category and formality (99.5% validation accuracy on category)
+4. **Color extraction:** K-means clustering (k=5) in Lab color space extracts primary, secondary, and tertiary colors matched against 949 XKCD named colors
 
 ---
 
@@ -57,9 +57,9 @@ Outfits are ranked by a composite score:
 
 S = 0.40 · Charmony + 0.40 · Fmatch + 0.20 · Sseason
 
-- **Charmony** — color harmony score computed from dominant hex values using HSL math (monochromatic, analogous, complementary, triadic detection)
-- **Fmatch** — formality compatibility (same tier = 1.0, one tier apart = 0.7, two tiers = 0.2)
-- **Sseason** — season compatibility based on item season tags
+- **Charmony:** color harmony score computed from dominant hex values using HSL math (monochromatic, analogous, complementary, triadic detection)
+- **Fmatch:** formality compatibility (same tier = 1.0, one tier apart = 0.7, two tiers = 0.2)
+- **Sseason:** season compatibility based on item season tags
 
 ---
 
@@ -158,14 +158,14 @@ API docs available at `http://127.0.0.1:8000/docs`
 
 | Phase | Status |
 |---|---|
-| 1 — Core backend | Complete |
-| 2 — CV pipeline | Complete |
-| 3 — Outfit generator | In Progress |
-| 4 — Recommendation engine | Planned |
-| 5 — Wardrobe analytics | Planned |
-| 6 — Frontend | Planned |
-| 7 — Real-time features | Planned |
-| 8 — Cloud deployment | Planned |
+| 1. Core backend | Complete |
+| 2. CV pipeline | Complete |
+| 3. Outfit generator | In Progress |
+| 4. Recommendation engine | Planned |
+| 5. Wardrobe analytics | Planned |
+| 6. Frontend | Planned |
+| 7. Real-time features | Planned |
+| 8. Cloud deployment | Planned |
 
 ---
 
