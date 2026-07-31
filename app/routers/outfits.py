@@ -7,6 +7,7 @@ from app.schemas.outfit import OutfitCreate, OutfitOut
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.clothing import ClothingItem
+from app.services.outfit_assembler import assemble_outfits
 
 router = APIRouter(prefix="/outfits", tags=["outfits"])
 
@@ -66,3 +67,82 @@ def delete_outfit(outfit_id: str, db: Session = Depends(get_db), current_user: U
     db.delete(outfit)
     db.commit()
     return {"detail": "Deleted"}
+
+@router.post("/generate")
+def generate_outfits(
+    occasion: str = None,
+    formality: str = "casual",
+    season: str = "all",
+    top_k: int = 5,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    results = assemble_outfits(
+        db=db,
+        owner_id=str(current_user.id),
+        occasion=occasion,
+        formality=formality,
+        current_season=season,
+        top_k=top_k
+    )
+
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail="Not enough wardrobe items to generate outfits. Add more clothing first."
+        )
+
+    return [
+        {
+            "score": r["score"],
+            "top": {
+                "id": str(r["slots"]["top"].id),
+                "name": r["slots"]["top"].name,
+                "color": r["slots"]["top"].color,
+                "color_hex": r["slots"]["top"].color_hex,
+                "image_url_clean": r["slots"]["top"].image_url_clean,
+            },
+            "bottom": {
+                "id": str(r["slots"]["bottom"].id),
+                "name": r["slots"]["bottom"].name,
+                "color": r["slots"]["bottom"].color,
+                "color_hex": r["slots"]["bottom"].color_hex,
+                "image_url_clean": r["slots"]["bottom"].image_url_clean,
+            },
+            "shoes": {
+                "id": str(r["slots"]["shoes"].id),
+                "name": r["slots"]["shoes"].name,
+                "color": r["slots"]["shoes"].color,
+                "color_hex": r["slots"]["shoes"].color_hex,
+                "image_url_clean": r["slots"]["shoes"].image_url_clean,
+            } if r["slots"]["shoes"] else None,
+        }
+        for r in results
+    ]
+
+@router.post("/{outfit_id}/score")
+def score_existing_outfit(
+    outfit_id: str,
+    season: str = "all",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    outfit = db.query(Outfit).filter(
+        Outfit.id == outfit_id,
+        Outfit.owner_id == current_user.id
+    ).first()
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+
+    items = [oi.clothing_item for oi in outfit.items]
+    if not items:
+        raise HTTPException(status_code=400, detail="Outfit has no items")
+
+    from app.services.outfit_scorer import score_outfit
+    score = score_outfit(items, season)
+
+    return {
+        "outfit_id": outfit_id,
+        "score": score,
+        "item_count": len(items)
+    }

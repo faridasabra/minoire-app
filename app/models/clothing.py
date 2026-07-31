@@ -15,6 +15,8 @@ class ClothingItem(Base):
     category = Column(String, nullable=False)
     color = Column(String, nullable=True)
     color_hex = Column(String(7), nullable=True)
+    color_secondary = Column(String, nullable=True)
+    color_tertiary = Column(String, nullable=True)
     pattern = Column(String, nullable=True)
     formality = Column(String, nullable=True)
     season = Column(ARRAY(String), nullable=True)

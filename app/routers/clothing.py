@@ -76,6 +76,8 @@ async def upload_item_image(
     item.formality = cv_results["formality"]
     item.color = cv_results["color"]
     item.color_hex = cv_results["color_hex"]
+    item.color_secondary = cv_results["color_secondary"]
+    item.color_tertiary = cv_results["color_tertiary"]
 
     db.commit()
     db.refresh(item)

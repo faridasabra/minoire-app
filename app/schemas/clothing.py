@@ -8,6 +8,8 @@ class ClothingItemCreate(BaseModel):
     category: str
     color: Optional[str] = None
     color_hex: Optional[str] = None
+    color_secondary: Optional[str] = None
+    color_tertiary: Optional[str] = None
     pattern: Optional[str] = None
     formality: Optional[str] = None
     season: Optional[List[str]] = None
@@ -19,6 +21,8 @@ class ClothingItemUpdate(BaseModel):
     category: Optional[str] = None
     color: Optional[str] = None
     color_hex: Optional[str] = None
+    color_secondary: Optional[str] = None
+    color_tertiary: Optional[str] = None
     pattern: Optional[str] = None
     formality: Optional[str] = None
     season: Optional[List[str]] = None
@@ -31,6 +35,8 @@ class ClothingItemOut(BaseModel):
     category: str
     color: Optional[str]
     color_hex: Optional[str]
+    color_secondary: Optional[str] = None
+    color_tertiary: Optional[str] = None
     pattern: Optional[str]
     formality: Optional[str]
     season: Optional[List[str]]

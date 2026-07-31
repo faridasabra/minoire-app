@@ -13,6 +13,7 @@ from sklearn.cluster import KMeans
 import numpy as np
 from PIL import Image
 import io
+import json
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -79,7 +80,6 @@ inference_transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# pipeline functions
 def remove_background(image_bytes: bytes) -> bytes:
     return remove(image_bytes)
 
@@ -105,23 +105,17 @@ def classify_clothing(image_bytes: bytes) -> dict:
         "color": color
     }
 
-COLOR_LOOKUP = {
-    "black":  [0, 0, 0],
-    "white":  [100, 0, 0],
-    "grey":   [55, 0, 2],
-    "beige":  [65, 4, 8],
-    "brown":  [35, 15, 20],
-    "red":    [40, 55, 45],
-    "orange": [60, 30, 50],
-    "yellow": [90, -10, 80],
-    "green":  [45, -35, 35],
-    "blue":   [35, 10, -45],
-    "purple": [35, 35, -30],
-    "pink":   [75, 30, 5],
-    "multi":  [50, 0, 0],
-}
+_COLOR_LOOKUP_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
+    "config", "color_lookup.json"
+)
+with open(_COLOR_LOOKUP_PATH, "r") as f:
+    _COLOR_DATA = json.load(f)
 
-def extract_dominant_color(image_bytes: bytes) -> tuple[str, str]:
+_COLOR_NAMES = list(_COLOR_DATA.keys())
+_COLOR_LABS = np.array([_COLOR_DATA[name]["lab"] for name in _COLOR_NAMES], dtype=np.float32)
+
+def extract_dominant_color(image_bytes: bytes) -> tuple[str, str, str, str]:
     image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     arr = np.array(image)
 
@@ -129,37 +123,61 @@ def extract_dominant_color(image_bytes: bytes) -> tuple[str, str]:
     pixels = arr[mask][:, :3].astype(np.float32)
 
     if len(pixels) < 10:
-        return "unknown", "#000000"
+        return "unknown", "#000000", None, None
 
-    if len(pixels) > 5000:
-        idx = np.random.choice(len(pixels), 5000, replace=False)
+    if len(pixels) > 8000:
+        idx = np.random.choice(len(pixels), 8000, replace=False)
         pixels = pixels[idx]
 
-    k = min(3, len(pixels))
-    kmeans = KMeans(n_clusters=k, n_init=5, random_state=42)
-    kmeans.fit(pixels)
+    from skimage.color import rgb2lab
+    pixels_normalized = pixels / 255.0
+    pixels_lab = rgb2lab(pixels_normalized.reshape(1, -1, 3)).reshape(-1, 3).astype(np.float32)
+
+    lab_variance = pixels_lab.var(axis=0).sum()
+    is_multicolor = lab_variance > 800
+
+    k = 5 if is_multicolor else 3
+    kmeans = KMeans(n_clusters=min(k, len(pixels)), n_init=10, random_state=42)
+    kmeans.fit(pixels_lab)
 
     counts = np.bincount(kmeans.labels_)
-    dominant_rgb = kmeans.cluster_centers_[counts.argmax()]
+    sorted_indices = counts.argsort()[::-1]
+    #dominant_rgb = kmeans.cluster_centers_[counts.argmax()]
+    #sorted_lab_centers = kmeans.cluster_centers_[sorted_indices]
+    #sorted_rgb_centers = pixels[[np.where(kmeans.labels_ == i)[0][0] for i in sorted_indices]]
 
-    r, g, b = [int(c) for c in dominant_rgb]
-    hex_color = f"#{r:02x}{g:02x}{b:02x}"
+    results = []
+    seen_colors = set()
 
-    from skimage.color import rgb2lab
-    rgb_normalized = np.array([[[r / 255, g / 255, b / 255]]], dtype=np.float32)
-    lab = rgb2lab(rgb_normalized)[0][0]
+    for i in sorted_indices:
+        lab_center = kmeans.cluster_centers_[i]
 
-    min_dist = float("inf")
-    nearest_color = "black"
-    for name, lab_ref in COLOR_LOOKUP.items():
-        if name == "multi":
+        diffs = _COLOR_LABS - lab_center
+        distances = np.sqrt((diffs ** 2).sum(axis=1))
+        nearest_idx = distances.argmin()
+        nearest_color = _COLOR_NAMES[nearest_idx]
+
+        if nearest_color in seen_colors:
             continue
-        dist = np.sqrt(sum((lab[i] - lab_ref[i]) ** 2 for i in range(3)))
-        if dist < min_dist:
-            min_dist = dist
-            nearest_color = name
+        seen_colors.add(nearest_color)
 
-    return nearest_color, hex_color
+        cluster_pixels = pixels[kmeans.labels_ == i]
+        avg_rgb = cluster_pixels.mean(axis=0)
+        r, g, b = [int(c) for c in avg_rgb]
+        hex_color = f"#{r:02x}{g:02x}{b:02x}"
+
+        results.append((nearest_color, hex_color))
+
+        if len(results) == 3:
+            break
+
+    while len(results) < 3:
+        results.append((None, None))
+
+    if is_multicolor:
+        return "multi", results[0][1], results[1][0] if len(results) > 1 else None, results[2][0] if len(results) > 2 else None
+
+    return results[0][0], results[0][1], results[1][0] if len(results) > 1 else None, results[2][0] if len(results) > 2 else None
 
 def process_clothing_image(raw_bytes: bytes, content_type: str) -> dict:
     clean_bytes = remove_background(raw_bytes)
@@ -170,13 +188,15 @@ def process_clothing_image(raw_bytes: bytes, content_type: str) -> dict:
 
     tags = classify_clothing(clean_bytes)
 
-    color_name, color_hex = extract_dominant_color(clean_bytes)
+    color, color_hex, color_secondary, color_tertiary = extract_dominant_color(clean_bytes)
 
     return {
         "image_url_clean": clean_url,
         "clip_embedding": embedding,
         "category": tags["category"],
         "formality": tags["formality"],
-        "color": color_name,
+        "color": color,
         "color_hex": color_hex,
+        "color_secondary": color_secondary,
+        "color_tertiary": color_tertiary,
     }
